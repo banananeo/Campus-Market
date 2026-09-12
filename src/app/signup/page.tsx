@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ShoppingBag } from "lucide-react"
 
+function getNextPath(): string {
+    if (typeof window === "undefined") return "/"
+    const next = new URLSearchParams(window.location.search).get("next")
+    return next && next.startsWith("/") ? next : "/"
+}
+
 export default function SignupPage() {
     const router = useRouter()
 
@@ -16,18 +22,27 @@ export default function SignupPage() {
     const [year, setYear] = useState("")
 
     const [error, setError] = useState("")
+    const [message, setMessage] = useState("")
     const [loading, setLoading] = useState(false)
 
     async function handleSignup(e: React.FormEvent) {
         e.preventDefault()
 
         setError("")
+        setMessage("")
         setLoading(true)
 
-        // Create authentication account
+        // Create authentication account with metadata (kept in sync with profiles)
         const { data, error: signupError } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+                data: {
+                    name,
+                    department,
+                    year: Number(year),
+                },
+            },
         })
 
         if (signupError) {
@@ -36,16 +51,19 @@ export default function SignupPage() {
             return
         }
 
-        // Create student profile
+        // Create student profile (upsert so retry / trigger race is safe)
         if (data.user) {
             const { error: profileError } = await supabase
                 .from("profiles")
-                .insert({
-                    id: data.user.id,
-                    name,
-                    department,
-                    year: Number(year),
-                })
+                .upsert(
+                    {
+                        id: data.user.id,
+                        name,
+                        department,
+                        year: Number(year),
+                    },
+                    { onConflict: "id" }
+                )
 
             if (profileError) {
                 setError(profileError.message)
@@ -54,7 +72,23 @@ export default function SignupPage() {
             }
         }
 
-        router.push("/")
+        // If email confirmation is on, there is no session yet — send to login.
+        // Otherwise go to the original destination.
+        const {
+            data: { session },
+        } = await supabase.auth.getSession()
+
+        setLoading(false)
+
+        if (!session) {
+            setMessage(
+                "Account created. Please check your email to verify, then log in."
+            )
+            return
+        }
+
+        router.push(getNextPath())
+        router.refresh()
     }
 
     const inputCls = "input-brutal w-full py-3"
@@ -111,6 +145,18 @@ export default function SignupPage() {
                             {error}
                         </p>
                     )}
+                    {message && (
+                        <div className="border-[3px] border-black bg-brutal-mint px-4 py-3 font-mono text-xs font-bold uppercase">
+                            {message}
+                            <button
+                                type="button"
+                                onClick={() => router.push("/login")}
+                                className="mt-2 block bg-black px-2 py-1 text-white"
+                            >
+                                Go to Login
+                            </button>
+                        </div>
+                    )}
                     <motion.button
                         whileHover={{ y: -2 }}
                         whileTap={{ scale: 0.97 }}
@@ -120,6 +166,17 @@ export default function SignupPage() {
                     >
                         {loading ? "Creating account..." : "Create Account"}
                     </motion.button>
+
+                    <div className="text-center font-mono text-xs font-bold uppercase tracking-widest text-black/60">
+                        Already have an account?{" "}
+                        <button
+                            type="button"
+                            onClick={() => router.push("/login")}
+                            className="bg-brutal-mint px-1 font-display text-black"
+                        >
+                            Login
+                        </button>
+                    </div>
                 </form>
             </motion.div>
         </main>

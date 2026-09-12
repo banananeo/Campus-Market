@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { label: "My Listings", href: "/my-listings" },
   { label: "Wishlist", href: "/wishlist" },
   { label: "Messages", href: "/messages" },
+  { label: "Profile", href: "/profile" },
 ];
 
 export default function Navbar() {
@@ -18,6 +19,7 @@ export default function Navbar() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/login");
+    router.refresh();
   }
 
   return (

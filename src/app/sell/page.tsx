@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
@@ -8,6 +8,10 @@ import { Camera } from "lucide-react"
 import AuthGuard from "@/components/AuthGuard"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/Footer"
+
+function sanitizeFileName(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/-+/g, "-").slice(0, 80)
+}
 
 export default function SellPage() {
     const router = useRouter()
@@ -23,6 +27,20 @@ export default function SellPage() {
     const [error, setError] = useState("")
     const [images, setImages] = useState<File[]>([])
     const [imagePreviews, setImagePreviews] = useState<string[]>([])
+
+    useEffect(() => {
+        return () => {
+            imagePreviews.forEach((url) => URL.revokeObjectURL(url))
+        }
+    }, [imagePreviews])
+
+    function removeImage(index: number) {
+        setImages((prev) => prev.filter((_, i) => i !== index))
+        setImagePreviews((prev) => {
+            URL.revokeObjectURL(prev[index])
+            return prev.filter((_, i) => i !== index)
+        })
+    }
     function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
         const selectedFiles = Array.from(e.target.files || [])
 
@@ -50,6 +68,7 @@ export default function SellPage() {
         }
 
         setError("")
+        imagePreviews.forEach((url) => URL.revokeObjectURL(url))
         setImages(selectedFiles)
 
         const previews = selectedFiles.map((file) =>
@@ -57,12 +76,21 @@ export default function SellPage() {
         )
 
         setImagePreviews(previews)
+        // Reset input so the same file can be picked again
+        e.target.value = ""
     }
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
         setLoading(true)
         setError("")
+
+        const parsedPrice = Number(price)
+        if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+            setError("Please enter a valid price.")
+            setLoading(false)
+            return
+        }
 
         const {
             data: { user },
@@ -81,7 +109,7 @@ export default function SellPage() {
                 seller_id: user.id,
                 title,
                 description,
-                price: Number(price),
+                price: parsedPrice,
                 category,
                 condition,
                 location,
@@ -97,9 +125,10 @@ export default function SellPage() {
             return
         }
 
-        // Upload images
+        // Upload images (rollback listing + uploaded files on failure)
+        const uploadedPaths: string[] = []
         for (const image of images) {
-            const fileName = `${user.id}/${listing.id}/${crypto.randomUUID()}-${image.name}`
+            const fileName = `${user.id}/${listing.id}/${crypto.randomUUID()}-${sanitizeFileName(image.name)}`
 
             const { error: uploadError } = await supabase.storage
                 .from("listing-images")
@@ -107,10 +136,14 @@ export default function SellPage() {
 
             if (uploadError) {
                 console.error(uploadError)
-                setError("Listing created, but an image failed to upload.")
+                await supabase.storage.from("listing-images").remove(uploadedPaths)
+                await supabase.from("listings").delete().eq("id", listing.id)
+                setError("Image upload failed. Listing was removed, please try again.")
                 setLoading(false)
                 return
             }
+
+            uploadedPaths.push(fileName)
 
             // Get public URL
             const {
@@ -129,13 +162,17 @@ export default function SellPage() {
 
             if (imageError) {
                 console.error(imageError)
-                setError("Listing created, but an image could not be saved.")
+                await supabase.storage.from("listing-images").remove(uploadedPaths)
+                await supabase.from("listing_images").delete().eq("listing_id", listing.id)
+                await supabase.from("listings").delete().eq("id", listing.id)
+                setError("Listing created, but an image could not be saved. Rolled back, please try again.")
                 setLoading(false)
                 return
             }
         }
 
         router.push("/")
+        router.refresh()
     }
 
     const inputCls = "input-brutal w-full py-3"
@@ -186,8 +223,15 @@ export default function SellPage() {
                                 {imagePreviews.length > 0 && (
                                     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                                         {imagePreviews.map((preview, index) => (
-                                            <div key={preview} className="aspect-square overflow-hidden border-[3px] border-black shadow-brutal-xs">
+                                            <div key={`${preview}-${index}`} className="relative aspect-square overflow-hidden border-[3px] border-black shadow-brutal-xs">
                                                 <img src={preview} alt={`Preview ${index + 1}`} className="h-full w-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeImage(index)}
+                                                    className="absolute right-1 top-1 border-[3px] border-black bg-brutal-red px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase text-white"
+                                                >
+                                                    X
+                                                </button>
                                             </div>
                                         ))}
                                     </div>

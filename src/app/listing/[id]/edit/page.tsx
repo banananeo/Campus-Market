@@ -20,6 +20,7 @@ export default function EditListing() {
     const [category, setCategory] = useState("")
     const [condition, setCondition] = useState("")
     const [location, setLocation] = useState("")
+    const [status, setStatus] = useState("available")
 
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -57,6 +58,7 @@ export default function EditListing() {
             setCategory(data.category)
             setCondition(data.condition)
             setLocation(data.location || "")
+            setStatus(data.status || "available")
 
             setLoading(false)
         }
@@ -70,17 +72,36 @@ export default function EditListing() {
         setSaving(true)
         setError("")
 
+        const parsedPrice = Number(price)
+        if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+            setError("Please enter a valid price.")
+            setSaving(false)
+            return
+        }
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+            setError("Please log in to edit a listing.")
+            setSaving(false)
+            return
+        }
+
         const { error } = await supabase
             .from("listings")
             .update({
                 title,
                 description,
-                price: Number(price),
+                price: parsedPrice,
                 category,
                 condition,
                 location,
+                status,
             })
             .eq("id", id)
+            .eq("seller_id", user.id)
 
         if (error) {
             console.error(error)
@@ -188,6 +209,14 @@ export default function EditListing() {
                             <div>
                                 <label className={labelCls}>Location</label>
                                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Example: Main Block" className={inputCls} />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Status</label>
+                                <select value={status} onChange={(e) => setStatus(e.target.value)} required className={inputCls}>
+                                    <option value="available">Available</option>
+                                    <option value="reserved">Reserved</option>
+                                    <option value="sold">Sold</option>
+                                </select>
                             </div>
                             {error && (
                                 <p className="border-[3px] border-black bg-brutal-red p-3 font-mono text-xs font-bold uppercase text-white">

@@ -17,13 +17,21 @@ export default function ListingDetails() {
     const [listing, setListing] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState("")
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
     const [isFavorite, setIsFavorite] = useState(false)
     const [favoriteLoading, setFavoriteLoading] = useState(false)
     const [message, setMessage] = useState("")
     const [sendingMessage, setSendingMessage] = useState(false)
+    const [contactError, setContactError] = useState("")
+    const [contactSuccess, setContactSuccess] = useState("")
 
     useEffect(() => {
         async function fetchListing() {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser()
+            setCurrentUserId(user?.id ?? null)
+
             const { data, error } = await supabase
                 .from("listings")
                 .select(`
@@ -45,6 +53,17 @@ export default function ListingDetails() {
                 setError("Unable to load this listing.")
             } else {
                 setListing(data)
+
+                // Hydrate wishlist state so toggle doesn't always insert
+                if (user) {
+                    const { data: fav } = await supabase
+                        .from("favorites")
+                        .select("listing_id")
+                        .eq("user_id", user.id)
+                        .eq("listing_id", data.id)
+                        .maybeSingle()
+                    setIsFavorite(!!fav)
+                }
             }
 
             setLoading(false)
@@ -53,8 +72,11 @@ export default function ListingDetails() {
         fetchListing()
     }, [id])
     async function contactSeller() {
+        setContactError("")
+        setContactSuccess("")
+
         if (!message.trim()) {
-            alert("Please enter a message.")
+            setContactError("Please enter a message.")
             return
         }
 
@@ -65,13 +87,13 @@ export default function ListingDetails() {
         } = await supabase.auth.getUser()
 
         if (!user) {
-            alert("Please log in to contact the seller.")
+            setContactError("Please log in to contact the seller.")
             setSendingMessage(false)
             return
         }
 
-        if (user.id === listing.profiles?.id) {
-            alert("You cannot message yourself.")
+        if (user.id === listing.seller_id) {
+            setContactError("You cannot message yourself.")
             setSendingMessage(false)
             return
         }
@@ -87,14 +109,15 @@ export default function ListingDetails() {
 
         if (error) {
             console.error(error)
-            alert("Could not send your message.")
+            setContactError("Could not send your message.")
             setSendingMessage(false)
             return
         }
 
         setMessage("")
-        alert("Message sent to the seller!")
+        setContactSuccess("Message sent! View it in Messages.")
         setSendingMessage(false)
+        router.push("/messages")
     }
     async function toggleFavorite() {
         setFavoriteLoading(true)
@@ -104,7 +127,7 @@ export default function ListingDetails() {
         } = await supabase.auth.getUser()
 
         if (!user) {
-            alert("Please log in to add items to your wishlist.")
+            setContactError("Please log in to use your wishlist.")
             setFavoriteLoading(false)
             return
         }
@@ -118,7 +141,7 @@ export default function ListingDetails() {
 
             if (error) {
                 console.error(error)
-                alert("Could not remove from wishlist.")
+                setContactError("Could not update wishlist.")
             } else {
                 setIsFavorite(false)
             }
@@ -131,8 +154,13 @@ export default function ListingDetails() {
                 })
 
             if (error) {
-                console.error(error)
-                alert("Could not add to wishlist.")
+                // Already saved (e.g. double-click) — treat as saved
+                if (error.code === "23505") {
+                    setIsFavorite(true)
+                } else {
+                    console.error(error)
+                    setContactError("Could not add to wishlist.")
+                }
             } else {
                 setIsFavorite(true)
             }
@@ -224,6 +252,30 @@ export default function ListingDetails() {
                             ₹{listing.price}
                         </div>
 
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <motion.button
+                                whileHover={{ y: -2 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={toggleFavorite}
+                                disabled={favoriteLoading}
+                                className={`btn-brutal flex items-center gap-2 px-4 py-2 text-xs disabled:opacity-50 ${isFavorite ? "bg-brutal-pink text-white" : "bg-white"}`}
+                            >
+                                <Heart size={14} strokeWidth={3} fill={isFavorite ? "currentColor" : "none"} />
+                                {favoriteLoading ? "Saving..." : isFavorite ? "Saved" : "Wishlist"}
+                            </motion.button>
+                            {currentUserId && currentUserId === listing.seller_id && (
+                                <motion.button
+                                    whileHover={{ y: -2 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => router.push(`/listing/${listing.id}/edit`)}
+                                    className="btn-brutal flex items-center gap-2 bg-brutal-yellow px-4 py-2 text-xs"
+                                >
+                                    <Pencil size={14} strokeWidth={3} />
+                                    Edit
+                                </motion.button>
+                            )}
+                        </div>
+
                         <div className="mt-5 border-[3px] border-black bg-brutal-cream p-4 shadow-brutal-sm">
                             <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest">
                                 <span className="grid h-7 w-7 place-items-center border-[3px] border-black bg-brutal-yellow">
@@ -249,6 +301,17 @@ export default function ListingDetails() {
                                 <Send size={15} strokeWidth={3} />
                                 {sendingMessage ? "Sending..." : "Contact Seller"}
                             </motion.button>
+
+                            {contactError && (
+                                <p className="mt-3 border-[3px] border-black bg-brutal-red p-3 font-mono text-xs font-bold uppercase text-white">
+                                    {contactError}
+                                </p>
+                            )}
+                            {contactSuccess && (
+                                <p className="mt-3 border-[3px] border-black bg-brutal-mint p-3 font-mono text-xs font-bold uppercase">
+                                    {contactSuccess}
+                                </p>
+                            )}
                         </div>
 
                         <h2 className="mt-6 border-t-[3px] border-black pt-4 font-display text-sm uppercase tracking-widest">

@@ -61,10 +61,57 @@ export default function MyListingsPage() {
             return
         }
 
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+            setError("Please log in to delete a listing.")
+            return
+        }
+
+        const target = listings.find((l) => l.id === listingId)
+        if (!target || target.seller_id !== user.id) {
+            alert("You can only delete your own listings.")
+            return
+        }
+
+        // Clean up images first so storage + child rows don't orphan
+        const { data: imageRows } = await supabase
+            .from("listing_images")
+            .select("image_url")
+            .eq("listing_id", listingId)
+
+        if (imageRows && imageRows.length > 0) {
+            const paths = imageRows
+                .map((row: { image_url: string }) => {
+                    // Stored public URL contains "/listing-images/<path>"
+                    const marker = "/listing-images/"
+                    const idx = row.image_url.indexOf(marker)
+                    return idx >= 0
+                        ? row.image_url.slice(idx + marker.length)
+                        : null
+                })
+                .filter((p): p is string => !!p)
+
+            if (paths.length > 0) {
+                await supabase.storage.from("listing-images").remove(paths)
+            }
+
+            await supabase
+                .from("listing_images")
+                .delete()
+                .eq("listing_id", listingId)
+        }
+
+        // Also clear wishlist saves for this listing (FK safety if no cascade)
+        await supabase.from("favorites").delete().eq("listing_id", listingId)
+
         const { error } = await supabase
             .from("listings")
             .delete()
             .eq("id", listingId)
+            .eq("seller_id", user.id)
 
         if (error) {
             console.error(error)
