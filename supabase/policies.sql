@@ -29,7 +29,13 @@ using (auth.uid() = id) with check (auth.uid() = id);
 -- Safety net: auto-create profile from auth metadata (keeps login/signup in sync)
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  allowed_domain text := '@srmist.edu.in';
 begin
+  if right(lower(new.email), length(allowed_domain)) <> allowed_domain then
+    raise exception 'Only % email addresses can sign up.', allowed_domain;
+  end if;
+
   insert into public.profiles (id, name, department, year)
   values (
     new.id,
