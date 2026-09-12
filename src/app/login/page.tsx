@@ -68,12 +68,12 @@ export default function LoginPage() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className={labelCls}>Email</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required className={inputCls} />
+                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="netID@srmist.edu.in" required className={inputCls} />
                         </div>
 
                         <div>
                             <label className={labelCls}>Password</label>
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} className={inputCls} />
+                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={8} className={inputCls} />
                         </div>
 
                         {error && (

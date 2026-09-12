@@ -33,6 +33,13 @@ export default function SignupPage() {
         setLoading(true)
 
         // Create authentication account with metadata (kept in sync with profiles)
+        const normalizedEmail = email.trim().toLowerCase()
+
+        if (!normalizedEmail.endsWith("@srmist.edu.in")) {
+            setError("Please use your SRM college email address (@srmist.edu.in).")
+            setLoading(false)
+            return
+        }
         const { data, error: signupError } = await supabase.auth.signUp({
             email,
             password,
@@ -80,13 +87,6 @@ export default function SignupPage() {
 
         setLoading(false)
 
-        if (!session) {
-            setMessage(
-                "Account created. Please check your email to verify, then log in."
-            )
-            return
-        }
-
         router.push(getNextPath())
         router.refresh()
     }
@@ -120,7 +120,7 @@ export default function SignupPage() {
                     </div>
                     <div>
                         <label className={labelCls}>Email</label>
-                        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="you@example.com" />
+                        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="netID@srmist.edu.in" />
                     </div>
                     <div>
                         <label className={labelCls}>Password</label>
