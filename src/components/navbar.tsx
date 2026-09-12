@@ -6,7 +6,6 @@ import { LogOut, Plus, ShoppingBag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const NAV_LINKS = [
-  { label: "Marketplace", href: "/" },
   { label: "My Listings", href: "/my-listings" },
   { label: "Wishlist", href: "/wishlist" },
   { label: "Messages", href: "/messages" },

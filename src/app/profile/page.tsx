@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Camera, Lock, Mail, Save, Trash2, User } from "lucide-react"
+import { ArrowLeft, Lock, Mail, Save, User } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import AuthGuard from "@/components/AuthGuard"
 import Navbar from "@/components/navbar"
@@ -18,19 +18,11 @@ export default function ProfilePage() {
     const [name, setName] = useState("")
     const [department, setDepartment] = useState("")
     const [year, setYear] = useState("")
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
     const [currentEmail, setCurrentEmail] = useState("")
 
     const [basicError, setBasicError] = useState("")
     const [basicSuccess, setBasicSuccess] = useState("")
     const [savingBasic, setSavingBasic] = useState(false)
-
-    const [avatarFile, setAvatarFile] = useState<File | null>(null)
-    const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-    const [avatarError, setAvatarError] = useState("")
-    const [avatarSuccess, setAvatarSuccess] = useState("")
-    const [uploadingAvatar, setUploadingAvatar] = useState(false)
-    const [removingAvatar, setRemovingAvatar] = useState(false)
 
     const [newEmail, setNewEmail] = useState("")
     const [emailError, setEmailError] = useState("")
@@ -59,7 +51,7 @@ export default function ProfilePage() {
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("name, department, year, avatar_url")
+                .select("name, department, year")
                 .eq("id", user.id)
                 .maybeSingle()
 
@@ -67,10 +59,6 @@ export default function ProfilePage() {
                 setName(profile.name || "")
                 setDepartment(profile.department || "")
                 setYear(profile.year ? String(profile.year) : "")
-                setAvatarUrl(
-                    (profile as { avatar_url?: string | null }).avatar_url ||
-                        null
-                )
             } else {
                 // Fall back to auth metadata for pre-trigger accounts
                 const meta = user.user_metadata || {}
@@ -84,12 +72,6 @@ export default function ProfilePage() {
 
         load()
     }, [])
-
-    useEffect(() => {
-        return () => {
-            if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-        }
-    }, [avatarPreview])
 
     async function handleSaveBasic(e: React.FormEvent) {
         e.preventDefault()
@@ -163,136 +145,6 @@ export default function ProfilePage() {
 
         setBasicSuccess("Profile updated.")
         setSavingBasic(false)
-        router.refresh()
-    }
-
-    function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-        setAvatarError("")
-        setAvatarSuccess("")
-        const file = e.target.files?.[0]
-        if (!file) return
-
-        if (!file.type.startsWith("image/")) {
-            setAvatarError("Please select only image files.")
-            return
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            setAvatarError("Avatar must be smaller than 5MB.")
-            return
-        }
-
-        if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-        setAvatarFile(file)
-        setAvatarPreview(URL.createObjectURL(file))
-        e.target.value = ""
-    }
-
-    async function handleAvatarUpload() {
-        setAvatarError("")
-        setAvatarSuccess("")
-        if (!avatarFile) {
-            setAvatarError("Choose a photo first.")
-            return
-        }
-
-        setUploadingAvatar(true)
-
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
-            setAvatarError("Please log in to upload an avatar.")
-            setUploadingAvatar(false)
-            return
-        }
-
-        const path = `${user.id}/avatar`
-        const { error: uploadError } = await supabase.storage
-            .from("avatars")
-            .upload(path, avatarFile, {
-                upsert: true,
-                contentType: avatarFile.type,
-            })
-
-        if (uploadError) {
-            console.error(uploadError)
-            setAvatarError(
-                "Upload failed. Run supabase/profile-update.sql to create the avatars bucket."
-            )
-            setUploadingAvatar(false)
-            return
-        }
-
-        const {
-            data: { publicUrl },
-        } = supabase.storage.from("avatars").getPublicUrl(path)
-        const stampedUrl = `${publicUrl}?t=${Date.now()}`
-
-        const { error: saveError } = await supabase
-            .from("profiles")
-            .upsert(
-                { id: user.id, avatar_url: stampedUrl },
-                { onConflict: "id" }
-            )
-
-        if (saveError) {
-            console.error(saveError)
-            setAvatarError(
-                "Uploaded, but could not save to profile. Run supabase/profile-update.sql to add avatar_url."
-            )
-            setUploadingAvatar(false)
-            return
-        }
-
-        await supabase.auth.updateUser({ data: { avatar_url: stampedUrl } })
-
-        setAvatarUrl(stampedUrl)
-        setAvatarFile(null)
-        if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-        setAvatarPreview(null)
-        setAvatarSuccess("Avatar updated.")
-        setUploadingAvatar(false)
-        router.refresh()
-    }
-
-    async function handleAvatarRemove() {
-        setAvatarError("")
-        setAvatarSuccess("")
-        setRemovingAvatar(true)
-
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
-            setAvatarError("Please log in to remove your avatar.")
-            setRemovingAvatar(false)
-            return
-        }
-
-        await supabase.storage.from("avatars").remove([`${user.id}/avatar`])
-
-        const { error } = await supabase
-            .from("profiles")
-            .update({ avatar_url: null })
-            .eq("id", user.id)
-
-        if (error) {
-            console.error(error)
-            setAvatarError(error.message)
-            setRemovingAvatar(false)
-            return
-        }
-
-        await supabase.auth.updateUser({ data: { avatar_url: null } })
-
-        setAvatarUrl(null)
-        setAvatarFile(null)
-        if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-        setAvatarPreview(null)
-        setAvatarSuccess("Avatar removed.")
-        setRemovingAvatar(false)
         router.refresh()
     }
 
@@ -375,8 +227,6 @@ export default function ProfilePage() {
             </AuthGuard>
         )
     }
-
-    const displayAvatar = avatarPreview || avatarUrl
 
     return (
         <AuthGuard>
@@ -485,80 +335,6 @@ export default function ProfilePage() {
                                     {savingBasic ? "Saving..." : "Save Info"}
                                 </motion.button>
                             </form>
-
-                            {/* Avatar */}
-                            <div className="border-[3px] border-black bg-white p-4 shadow-brutal-sm">
-                                <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest">
-                                    <span className="grid h-7 w-7 place-items-center border-[3px] border-black bg-brutal-yellow">
-                                        <Camera size={14} strokeWidth={3} />
-                                    </span>
-                                    Avatar
-                                </p>
-                                <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row">
-                                    <span className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden border-[3px] border-black bg-brutal-cream shadow-brutal-xs">
-                                        {displayAvatar ? (
-                                            <img
-                                                src={displayAvatar}
-                                                alt="Avatar"
-                                                className="h-full w-full object-cover"
-                                            />
-                                        ) : (
-                                            <User size={28} strokeWidth={3} />
-                                        )}
-                                    </span>
-                                    <div className="w-full flex-1">
-                                        <label className="flex cursor-pointer flex-col items-center justify-center border-[3px] border-dashed border-black bg-brutal-cream p-4 text-center transition hover:bg-brutal-yellow">
-                                            <span className="font-display text-xs uppercase">
-                                                {avatarFile ? avatarFile.name : "Choose photo"}
-                                            </span>
-                                            <span className="mt-1 font-mono text-[10px] font-bold uppercase tracking-widest text-black/60">
-                                                Image only · Max 5MB
-                                            </span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleAvatarChange}
-                                                className="hidden"
-                                            />
-                                        </label>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <motion.button
-                                                whileHover={{ y: -2 }}
-                                                whileTap={{ scale: 0.97 }}
-                                                type="button"
-                                                onClick={handleAvatarUpload}
-                                                disabled={uploadingAvatar || !avatarFile}
-                                                className="btn-brutal bg-black px-4 py-2 text-xs text-white disabled:opacity-50"
-                                            >
-                                                {uploadingAvatar ? "Uploading..." : "Upload"}
-                                            </motion.button>
-                                            {(avatarUrl || avatarPreview) && (
-                                                <motion.button
-                                                    whileHover={{ y: -2 }}
-                                                    whileTap={{ scale: 0.97 }}
-                                                    type="button"
-                                                    onClick={handleAvatarRemove}
-                                                    disabled={removingAvatar}
-                                                    className="btn-brutal flex items-center gap-1 bg-brutal-red px-4 py-2 text-xs text-white disabled:opacity-50"
-                                                >
-                                                    <Trash2 size={13} strokeWidth={3} />
-                                                    {removingAvatar ? "Removing..." : "Remove"}
-                                                </motion.button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                {avatarError && (
-                                    <p className="mt-3 border-[3px] border-black bg-brutal-red p-3 font-mono text-xs font-bold uppercase text-white">
-                                        {avatarError}
-                                    </p>
-                                )}
-                                {avatarSuccess && (
-                                    <p className="mt-3 border-[3px] border-black bg-brutal-mint p-3 font-mono text-xs font-bold uppercase">
-                                        {avatarSuccess}
-                                    </p>
-                                )}
-                            </div>
 
                             {/* Email */}
                             <form

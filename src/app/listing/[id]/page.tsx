@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Heart, MessageSquare, Pencil, Send, User } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, Heart, MessageSquare, Pencil, Send, User } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/Footer"
@@ -24,6 +24,7 @@ export default function ListingDetails() {
     const [sendingMessage, setSendingMessage] = useState(false)
     const [contactError, setContactError] = useState("")
     const [contactSuccess, setContactSuccess] = useState("")
+    const [activeIndex, setActiveIndex] = useState(0)
 
     useEffect(() => {
         async function fetchListing() {
@@ -53,6 +54,7 @@ export default function ListingDetails() {
                 setError("Unable to load this listing.")
             } else {
                 setListing(data)
+                setActiveIndex(0)
 
                 // Hydrate wishlist state so toggle doesn't always insert
                 if (user) {
@@ -197,6 +199,27 @@ export default function ListingDetails() {
         )
     }
 
+    const images: string[] =
+        listing.listing_images
+            ?.map((img: { image_url: string }) => img.image_url)
+            .filter(Boolean) ?? []
+    const safeIndex =
+        images.length > 0 ? Math.min(activeIndex, images.length - 1) : 0
+
+    function showPrev() {
+        setActiveIndex((prev) =>
+            images.length === 0
+                ? 0
+                : (prev - 1 + images.length) % images.length
+        )
+    }
+
+    function showNext() {
+        setActiveIndex((prev) =>
+            images.length === 0 ? 0 : (prev + 1) % images.length
+        )
+    }
+
     return (
         <main className="min-h-screen font-grotesk text-black">
             <Navbar />
@@ -217,19 +240,72 @@ export default function ListingDetails() {
                     transition={{ type: "spring", stiffness: 200, damping: 20 }}
                     className="mt-4 grid gap-8 md:grid-cols-2"
                 >
-                    {/* Image */}
+                    {/* Image gallery */}
                     <div className="card-brutal overflow-hidden">
-                        <div className="border-b-[4px] border-black bg-brutal-yellow px-4 py-2">
+                        <div className="flex items-center justify-between border-b-[4px] border-black bg-brutal-yellow px-4 py-2">
                             <span className="font-mono text-[11px] font-bold uppercase tracking-widest">
                                 Listing #{listing.id}
                             </span>
+                            {images.length > 1 && (
+                                <span className="font-mono text-[11px] font-bold uppercase tracking-widest">
+                                    {safeIndex + 1} / {images.length}
+                                </span>
+                            )}
                         </div>
-                        {listing.listing_images?.[0]?.image_url ? (
-                            <img
-                                src={listing.listing_images[0].image_url}
-                                alt={listing.title}
-                                className="h-[380px] w-full object-cover"
-                            />
+                        {images.length > 0 ? (
+                            <>
+                                <div className="relative bg-brutal-cream">
+                                    <img
+                                        src={images[safeIndex]}
+                                        alt={`${listing.title} - photo ${safeIndex + 1}`}
+                                        className="h-[380px] w-full object-contain"
+                                    />
+                                    {images.length > 1 && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={showPrev}
+                                                aria-label="Previous photo"
+                                                className="btn-brutal absolute left-3 top-1/2 -translate-y-1/2 bg-white p-2"
+                                            >
+                                                <ChevronLeft size={18} strokeWidth={3} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={showNext}
+                                                aria-label="Next photo"
+                                                className="btn-brutal absolute right-3 top-1/2 -translate-y-1/2 bg-white p-2"
+                                            >
+                                                <ChevronRight size={18} strokeWidth={3} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                                {images.length > 1 && (
+                                    <div className="flex gap-2 overflow-x-auto border-t-[4px] border-black bg-white p-3">
+                                        {images.map((url, index) => (
+                                            <button
+                                                key={`${url}-${index}`}
+                                                type="button"
+                                                onClick={() => setActiveIndex(index)}
+                                                aria-label={`View photo ${index + 1}`}
+                                                className={`h-16 w-16 shrink-0 overflow-hidden border-[3px] border-black transition ${
+                                                    index === safeIndex
+                                                        ? "bg-brutal-yellow opacity-100 shadow-brutal-xs"
+                                                        : "bg-brutal-cream opacity-60 hover:opacity-100"
+                                                }`}
+                                            >
+                                                <img
+                                                    src={url}
+                                                    alt=""
+                                                    loading="lazy"
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <div className="halftone flex h-[380px] w-full items-center justify-center font-mono text-xs font-bold uppercase tracking-widest text-black/60">
                                 No image available
