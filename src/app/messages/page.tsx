@@ -118,6 +118,41 @@ export default function MessagesPage() {
     useEffect(() => {
         fetchMessages()
     }, [])
+    useEffect(() => {
+        if (!currentUserId) return
+
+        const channel = supabase
+            .channel(`messages-${currentUserId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "messages",
+                    filter: `receiver_id=eq.${currentUserId}`,
+                },
+                () => {
+                    fetchMessages()
+                }
+            )
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "messages",
+                    filter: `sender_id=eq.${currentUserId}`,
+                },
+                () => {
+                    fetchMessages()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [currentUserId])
 
     async function sendReply() {
         setReplyError("")
@@ -191,20 +226,20 @@ export default function MessagesPage() {
 
     const selectedConversation = selectedThreadKey
         ? messages.find(
-              (item) => threadKey(item, currentUserId) === selectedThreadKey
-          ) || null
+            (item) => threadKey(item, currentUserId) === selectedThreadKey
+        ) || null
         : null
 
     const conversationMessages = selectedThreadKey
         ? messages
-              .filter(
-                  (item) => threadKey(item, currentUserId) === selectedThreadKey
-              )
-              .sort(
-                  (a, b) =>
-                      new Date(a.created_at).getTime() -
-                      new Date(b.created_at).getTime()
-              )
+            .filter(
+                (item) => threadKey(item, currentUserId) === selectedThreadKey
+            )
+            .sort(
+                (a, b) =>
+                    new Date(a.created_at).getTime() -
+                    new Date(b.created_at).getTime()
+            )
         : []
 
     if (loading) {
@@ -305,11 +340,10 @@ export default function MessagesPage() {
                                                 whileHover={{ y: -3 }}
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => setSelectedThreadKey(key)}
-                                                className={`w-full border-[4px] border-black p-4 text-left transition-shadow ${
-                                                    isActive
+                                                className={`w-full border-[4px] border-black p-4 text-left transition-shadow ${isActive
                                                         ? "bg-brutal-yellow shadow-brutal"
                                                         : "bg-white shadow-brutal-sm hover:shadow-brutal"
-                                                }`}
+                                                    }`}
                                             >
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0 flex-1">
@@ -397,20 +431,18 @@ export default function MessagesPage() {
                                                     >
                                                         <div className="max-w-[78%]">
                                                             <div
-                                                                className={`border-[3px] border-black px-4 py-2.5 shadow-brutal-xs ${
-                                                                    isMine
+                                                                className={`border-[3px] border-black px-4 py-2.5 shadow-brutal-xs ${isMine
                                                                         ? "bg-black text-white"
                                                                         : "bg-white text-black"
-                                                                }`}
+                                                                    }`}
                                                             >
                                                                 <p className="text-sm font-medium leading-relaxed">
                                                                     {item.message}
                                                                 </p>
                                                             </div>
                                                             <p
-                                                                className={`mt-1 font-mono text-[10px] font-bold uppercase tracking-widest text-black/50 ${
-                                                                    isMine ? "text-right" : "text-left"
-                                                                }`}
+                                                                className={`mt-1 font-mono text-[10px] font-bold uppercase tracking-widest text-black/50 ${isMine ? "text-right" : "text-left"
+                                                                    }`}
                                                             >
                                                                 {new Date(item.created_at).toLocaleString([], {
                                                                     day: "2-digit",
