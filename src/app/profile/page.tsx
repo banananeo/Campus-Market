@@ -29,6 +29,7 @@ export default function ProfilePage() {
     const [emailSuccess, setEmailSuccess] = useState("")
     const [savingEmail, setSavingEmail] = useState(false)
 
+    const [currentPassword, setCurrentPassword] = useState("")
     const [newPassword, setNewPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
     const [pwError, setPwError] = useState("")
@@ -391,6 +392,14 @@ export default function ProfilePage() {
                                 </p>
                                 <div className="mt-4 space-y-4">
                                     <div>
+                                        <label className={labelCls}>Current password</label>
+                                        <input
+                                            type="password"
+                                            value={currentPassword}
+                                            onChange={(e) => setCurrentPassword(e.target.value)}
+                                            placeholder="Enter current password"
+                                            className={inputCls}
+                                        />
                                         <label className={labelCls}>New password</label>
                                         <input
                                             type="password"
