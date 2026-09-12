@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Heart, MessageSquare, Pencil, User } from "lucide-react"
+import { ArrowLeft, Heart, MessageSquare, Pencil, Send, User } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/Footer"
@@ -224,22 +224,31 @@ export default function ListingDetails() {
                             ₹{listing.price}
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="mt-5 border-[3px] border-black bg-brutal-cream p-4 shadow-brutal-sm">
+                            <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest">
+                                <span className="grid h-7 w-7 place-items-center border-[3px] border-black bg-brutal-yellow">
+                                    <MessageSquare size={14} strokeWidth={3} />
+                                </span>
+                                Contact seller
+                            </p>
                             <textarea
                                 value={message}
                                 onChange={(e) => setMessage(e.target.value)}
                                 placeholder="Hi, is this item still available?"
                                 rows={4}
-                                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-black"
+                                className="input-brutal mt-3 w-full resize-none"
                             />
 
-                            <button
+                            <motion.button
+                                whileHover={{ y: -2 }}
+                                whileTap={{ scale: 0.97 }}
                                 onClick={contactSeller}
                                 disabled={sendingMessage}
-                                className="w-full rounded-xl bg-black py-3 font-semibold text-white transition hover:bg-gray-800 disabled:opacity-50"
+                                className="btn-brutal mt-3 flex w-full items-center justify-center gap-2 bg-black px-5 py-3 text-sm text-white disabled:opacity-50"
                             >
+                                <Send size={15} strokeWidth={3} />
                                 {sendingMessage ? "Sending..." : "Contact Seller"}
-                            </button>
+                            </motion.button>
                         </div>
 
                         <h2 className="mt-6 border-t-[3px] border-black pt-4 font-display text-sm uppercase tracking-widest">

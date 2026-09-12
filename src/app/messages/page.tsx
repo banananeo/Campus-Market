@@ -6,6 +6,12 @@ import AuthGuard from "@/components/AuthGuard"
 import Navbar from "@/components/navbar"
 import { supabase } from "@/lib/supabase"
 
+type Profile = {
+    name: string
+    department: string | null
+    year: number | null
+}
+
 type Message = {
     id: number
     sender_id: string
@@ -16,19 +22,11 @@ type Message = {
 
     listings: {
         title: string
-    } | null
+    }[] | null
 
-    sender: {
-        name: string
-        department: string | null
-        year: number | null
-    } | null
+    sender: Profile[] | null
 
-    receiver: {
-        name: string
-        department: string | null
-        year: number | null
-    } | null
+    receiver: Profile[] | null
 }
 
 export default function MessagesPage() {
@@ -43,7 +41,6 @@ export default function MessagesPage() {
     const [reply, setReply] = useState("")
     const [sendingReply, setSendingReply] = useState(false)
 
-    // Get all messages for the current user
     async function fetchMessages() {
         const {
             data: { user },
@@ -94,7 +91,6 @@ export default function MessagesPage() {
         fetchMessages()
     }, [])
 
-    // Send a reply
     async function sendReply() {
         if (!reply.trim() || !selectedListingId) {
             return
@@ -122,13 +118,11 @@ export default function MessagesPage() {
             return
         }
 
-        // Find the other person
         const receiverId =
             selectedMessage.sender_id === user.id
                 ? selectedMessage.receiver_id
                 : selectedMessage.sender_id
 
-        // Prevent messaging yourself
         if (receiverId === user.id) {
             alert("You cannot message yourself.")
             setSendingReply(false)
@@ -158,7 +152,6 @@ export default function MessagesPage() {
         setSendingReply(false)
     }
 
-    // Get messages for selected conversation
     const conversationMessages = messages
         .filter(
             (item) => item.listing_id === selectedListingId
@@ -169,7 +162,6 @@ export default function MessagesPage() {
                 new Date(b.created_at).getTime()
         )
 
-    // Get the selected conversation
     const selectedConversation = messages.find(
         (item) => item.listing_id === selectedListingId
     )
@@ -213,7 +205,7 @@ export default function MessagesPage() {
 
                             <button
                                 onClick={() => router.push("/")}
-                                className="mt-6 rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
+                                className="mt-6 rounded-xl bg-black px-6 py-3 font-semibold text-white hover:bg-gray-800"
                             >
                                 Browse Marketplace
                             </button>
@@ -221,7 +213,7 @@ export default function MessagesPage() {
 
                     ) : (
 
-                        /* Messages layout */
+                        /* Messages */
                         <div className="grid gap-6 md:grid-cols-[0.8fr_1.2fr]">
 
                             {/* Conversation list */}
@@ -238,19 +230,19 @@ export default function MessagesPage() {
                                             setSelectedListingId(item.listing_id)
                                         }
                                         className={`w-full rounded-2xl border bg-white p-5 text-left transition ${selectedListingId === item.listing_id
-                                                ? "border-black"
-                                                : "border-[#e5e5e5] hover:border-gray-400"
+                                            ? "border-black"
+                                            : "border-[#e5e5e5] hover:border-gray-400"
                                             }`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
 
                                             <div className="min-w-0">
                                                 <h3 className="truncate font-semibold text-black">
-                                                    {item.listings?.title || "Listing"}
+                                                    {item.listings?.[0]?.title || "Listing"}
                                                 </h3>
 
                                                 <p className="mt-1 text-sm text-gray-500">
-                                                    {item.sender?.name || "Student"}
+                                                    {item.sender?.[0]?.name || "Student"}
                                                 </p>
                                             </div>
 
@@ -262,6 +254,7 @@ export default function MessagesPage() {
                                                     minute: "2-digit",
                                                 })}
                                             </span>
+
                                         </div>
 
                                         <p className="mt-3 line-clamp-2 text-sm text-gray-600">
@@ -301,13 +294,13 @@ export default function MessagesPage() {
                                         <div className="border-b border-[#e5e5e5] p-5">
 
                                             <h2 className="font-semibold text-black">
-                                                {selectedConversation?.listings?.title ||
+                                                {selectedConversation?.listings?.[0]?.title ||
                                                     "Conversation"}
                                             </h2>
 
                                             <p className="mt-1 text-sm text-gray-500">
                                                 With{" "}
-                                                {selectedConversation?.sender?.name ||
+                                                {selectedConversation?.sender?.[0]?.name ||
                                                     "Student"}
                                             </p>
 
@@ -324,25 +317,25 @@ export default function MessagesPage() {
 
                                         </div>
 
-                                        {/* Messages */}
+                                        {/* Conversation */}
                                         <div className="flex-1 space-y-3 overflow-y-auto p-5">
 
                                             {conversationMessages.map((item) => (
                                                 <div
                                                     key={item.id}
                                                     className={`flex ${item.sender_id ===
-                                                            selectedConversation?.receiver_id
-                                                            ? "justify-start"
-                                                            : "justify-end"
+                                                        selectedConversation?.receiver_id
+                                                        ? "justify-start"
+                                                        : "justify-end"
                                                         }`}
                                                 >
                                                     <div className="max-w-[75%]">
 
                                                         <div
                                                             className={`rounded-2xl px-4 py-3 ${item.sender_id ===
-                                                                    selectedConversation?.receiver_id
-                                                                    ? "bg-gray-100 text-gray-800"
-                                                                    : "bg-black text-white"
+                                                                selectedConversation?.receiver_id
+                                                                ? "bg-gray-100 text-gray-800"
+                                                                : "bg-black text-white"
                                                                 }`}
                                                         >
                                                             <p className="text-sm">
@@ -352,9 +345,9 @@ export default function MessagesPage() {
 
                                                         <p
                                                             className={`mt-1 text-xs text-gray-400 ${item.sender_id ===
-                                                                    selectedConversation?.receiver_id
-                                                                    ? "text-left"
-                                                                    : "text-right"
+                                                                selectedConversation?.receiver_id
+                                                                ? "text-left"
+                                                                : "text-right"
                                                                 }`}
                                                         >
                                                             {new Date(
@@ -368,7 +361,7 @@ export default function MessagesPage() {
 
                                         </div>
 
-                                        {/* Reply box */}
+                                        {/* Reply */}
                                         <div className="border-t border-[#e5e5e5] p-5">
 
                                             <textarea
@@ -399,7 +392,7 @@ export default function MessagesPage() {
                                             <div className="mt-3 flex items-center justify-between">
 
                                                 <p className="text-xs text-gray-400">
-                                                    Press Enter to send
+                                                    Enter to send • Shift + Enter for a new line
                                                 </p>
 
                                                 <button

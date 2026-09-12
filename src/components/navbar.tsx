@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { label: "Marketplace", href: "/" },
   { label: "My Listings", href: "/my-listings" },
   { label: "Wishlist", href: "/wishlist" },
+  { label: "Messages", href: "/messages" },
 ];
 
 export default function Navbar() {
@@ -46,12 +47,6 @@ export default function Navbar() {
               {link.label}
             </motion.button>
           ))}
-          <button
-            onClick={() => router.push("/messages")}
-            className="text-sm text-gray-600 hover:text-black"
-          >
-            Messages
-          </button>
           <motion.button
             whileHover={{ y: -2, rotate: -1 }}
             whileTap={{ scale: 0.9 }}
